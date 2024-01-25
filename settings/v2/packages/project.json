@@ -1,0 +1,29 @@
+{
+  "__version__": "1.0.4",
+  "general": {
+    "designResolution": {
+      "height": 450,
+      "width": 800
+    }
+  },
+  "physics": {
+    "collisionGroups": [
+      {
+        "index": 1,
+        "name": "BULLET"
+      },
+      {
+        "index": 2,
+        "name": "CHARACTER"
+      }
+    ],
+    "collisionMatrix": {
+      "0": 7,
+      "1": 17,
+      "2": 57,
+      "3": 4,
+      "4": 6,
+      "5": 4
+    }
+  }
+}

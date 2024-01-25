@@ -1,0 +1,10 @@
+{
+  "name": "JecbackJoyRide",
+  "uuid": "95a3a66b-9614-4c00-80fc-6e7f5e10e47c",
+  "creator": {
+    "version": "3.7.2"
+  },
+  "dependencies": {
+    "@onechaintech/gamesdk-dev": "^0.0.33"
+  }
+}
