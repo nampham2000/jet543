@@ -1,4 +1,4 @@
-import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3,Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate } from 'cc';
+import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3,Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate, view } from 'cc';
 import { GameModel } from './GameModel';
 import { ObjectPool } from '../Pool/ObjectPool';
 import { NodeCustom } from '../Pool/NodeCustom';
@@ -120,6 +120,9 @@ export class GameController extends Component {
     @property(Node)
     private Head: Node;
 
+    @property(Node)
+    private checkGlowScreen:Node;
+
 
     private nextfire:number=0;
     private nexfireRocket:number=0;
@@ -128,17 +131,13 @@ export class GameController extends Component {
     private checkFly:Boolean=false;
     private nextRocket:number=500;
     private rocket;
-    private speed=10;
+    private speed=5;
     private countHitLand:number=0;
     private Score:number=0;
     private countScore:number=1;
     private checkStart:boolean=false;
     private checkStart1:boolean=false;
     private Speed:number=3;
-    private maxMonsters: number = 10;
-    private monsterCount: number = 0;
-    private monsterPrefabsCount: number = 1;
-    private jetPos;
 
 
     protected onLoad(): void {
@@ -172,6 +171,7 @@ export class GameController extends Component {
         ObjectPool.Instance.CreateListObject(Constants.Rocket,this.gameModel.RocketPrefabs,5,this.gameModel.RocketNode);
         this.contactChar();
         this.contactBird();
+        // this.contactEnemy();
         if(this.checkPoint2.active===true)
         {
             this.checkPoint2.active=false;
@@ -193,6 +193,13 @@ export class GameController extends Component {
             playerCollider.on(Contact2DType.BEGIN_CONTACT, this.charcontact, this);
         }
     }
+
+    // private contactEnemy(): void {
+    //     const playerCollider = this.checkGlowScreen.getComponent(Collider2D);
+    //     if (playerCollider) {
+    //         playerCollider.on(Contact2DType.BEGIN_CONTACT, this.glowContact, this);
+    //     }
+    // }
 
     protected update(deltaTime: number): void {
         
@@ -234,15 +241,21 @@ export class GameController extends Component {
             let RotationRandom= math.randomRange(0,360);
             Enemy && (Enemy.GetNode().position = new Vec3(i * spacing, 0, 0));
             Enemy && (Enemy.GetNode().setRotationFromEuler(0, 0, RotationRandom));
-            // if(Enemy)
-            // {
-            //     tween(Enemy.GetNode())
-            //     .to((Math.abs(-1500-Enemy.GetNode().position.x)/150), { position: new Vec3(-1500, 0)})
-            //     .call(() => { console.log('This is a callback'); })
-            //     .start()
-            //     console.log(-1500-Enemy.GetNode().position.x);
-            // }
-            
+        }
+
+        for (let i = 0; i < this.glowNode.children.length; i++) {
+            const childNode = this.glowNode.children[i];
+            const newX = childNode.position.x - this.speed ;
+            childNode.position = new Vec3(newX, childNode.position.y, childNode.position.z);
+            if(childNode.position.x<-2000)
+            {
+                const randomDelay = Math.floor(math.randomRange(3000, 7000));;
+                setTimeout(() => {
+                const randomValueX = Math.floor(math.randomRange(400, 900));
+                const randomValueY = Math.floor(math.randomRange(40, 100));
+                childNode.position = new Vec3(randomValueX, randomValueY);
+            }, randomDelay);
+            }
         }
     }
     }
@@ -338,6 +351,25 @@ export class GameController extends Component {
             this.OverPandel.active=true;
         }
     }
+
+    // private async glowContact(selfCollider: Collider2D, otherCollider: Collider2D, contact: IPhysics2DContact | null): Promise<void> {
+    //     console.log("aaaa");
+    
+    //     // Tạo một độ trễ ngẫu nhiên trong khoảng từ 500ms đến 1500ms
+    //     const randomDelay = Math.floor(math.randomRange(3000, 7000));;
+    
+    //     // Đặt một timeout để thực hiện thay đổi vị trí sau độ trễ ngẫu nhiên
+    //     setTimeout(() => {
+    //         const randomValueX = Math.floor(math.randomRange(400, 900));
+    //         const randomValueY = Math.floor(math.randomRange(40, 100));
+    //         const randomScaleX = Math.random() * (1 - 0.7) + 0.7;
+    //         const randomScaleY = Math.random() * (1 - 0.5) + 0.5;
+    
+    //         // Áp dụng các giá trị ngẫu nhiên vào vị trí và tỷ lệ của otherCollider.node
+    //         otherCollider.node.position = new Vec3(randomValueX, randomValueY);
+    //         // otherCollider.node.setScale(randomScaleX, randomScaleY);
+    //     }, randomDelay);
+    // }
 
     private delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
