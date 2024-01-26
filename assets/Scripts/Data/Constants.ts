@@ -14,6 +14,7 @@ export class Constants extends Component {
     public static readonly glowOffPrefab: string = 'Glowoff';
     public static readonly bulletAnim: string = 'BulletAnim';
     public static readonly Rocket: string = 'Rocket';
+    public static readonly sceneEntry: string = 'Game';
 
     public static readonly NODE_NAME = {
         GameClient: 'GameClient'

@@ -1,10 +1,9 @@
-import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3,Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate, view } from 'cc';
+import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3,Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate, view, Label } from 'cc';
 import { GameModel } from './GameModel';
 import { ObjectPool } from '../Pool/ObjectPool';
 import { NodeCustom } from '../Pool/NodeCustom';
 import { Constants } from '../Data/Constants';
 import { GameCenterController } from '../GameCenterController/GameCenterController';
-import { BaseEnemy } from './BaseEnemy';
 const { ccclass, property } = _decorator;
 
 @ccclass('GameController')
@@ -123,6 +122,17 @@ export class GameController extends Component {
     @property(Node)
     private checkGlowScreen:Node;
 
+    @property(Node)
+    private Setting:Node;
+
+    @property(Node)
+    private SettingIcon:Node;
+
+    @property(Label)
+    private ScoreCur:Label;
+    @property(Label)
+    private ScoreEnd:Label;
+
 
     private nextfire:number=0;
     private nexfireRocket:number=0;
@@ -131,17 +141,18 @@ export class GameController extends Component {
     private checkFly:Boolean=false;
     private nextRocket:number=500;
     private rocket;
-    private speed=5;
+    private speed=10;
     private countHitLand:number=0;
     private Score:number=0;
     private countScore:number=1;
     private checkStart:boolean=false;
     private checkStart1:boolean=false;
     private Speed:number=3;
-
+    private JacketPos;
 
     protected onLoad(): void {
-        // this.gameCenter.startMatch(()=>{
+        this.gameCenter.startMatch(()=>{
+        this.JacketPos=this.gameModel.Jacket.position.clone();
         if(this.OverPandel)
         {
             this.OverPandel.active=false;
@@ -154,21 +165,17 @@ export class GameController extends Component {
         {
             this.title.active=true;
         }
-        this.SkipNode.active=false;
-        setTimeout(() => {
-            this.SkipNode.active=true
-        }, 1000);
-
-        setTimeout(() => {
-            this.SkipNode.active=false
-        }, 5000);
-        input.on(Input.EventType.TOUCH_START,this.touchStart,this);
-        input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
+        if(this.SkipNode)
+        {
+            this.SkipNode.active=false;
+        }
+        // input.on(Input.EventType.TOUCH_START,this.touchStart,this);
+        // input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
         ObjectPool.Instance.CreateListObject(Constants.bulletPrefab1,this.bullet,30,this.BulletNode);
-        ObjectPool.Instance.CreateListObject(Constants.glowPrefab,this.glow,10,this.glowNode);
-        ObjectPool.Instance.CreateListObject(Constants.glowOffPrefab,this.glowOff,10,this.glowNode);
+        ObjectPool.Instance.CreateListObject(Constants.glowPrefab,this.glow,3,this.glowNode);
+        ObjectPool.Instance.CreateListObject(Constants.glowOffPrefab,this.glowOff,2,this.glowNode);
         ObjectPool.Instance.CreateListObject(Constants.bulletAnim,this.bulletAnim,10,this.gameModel.BulletAnim);
-        ObjectPool.Instance.CreateListObject(Constants.Rocket,this.gameModel.RocketPrefabs,5,this.gameModel.RocketNode);
+        ObjectPool.Instance.CreateListObject(Constants.Rocket,this.gameModel.RocketPrefabs,2,this.gameModel.RocketNode);
         this.contactChar();
         this.contactBird();
         // this.contactEnemy();
@@ -177,7 +184,7 @@ export class GameController extends Component {
             this.checkPoint2.active=false;
         }
         this.checkStart1=true
-    // });
+    });
     }
 
     private contactBird(): void {
@@ -194,19 +201,13 @@ export class GameController extends Component {
         }
     }
 
-    // private contactEnemy(): void {
-    //     const playerCollider = this.checkGlowScreen.getComponent(Collider2D);
-    //     if (playerCollider) {
-    //         playerCollider.on(Contact2DType.BEGIN_CONTACT, this.glowContact, this);
-    //     }
-    // }
-
     protected update(deltaTime: number): void {
-        
         if(this.checkStart&&this.checkStart1)
         {
             this.gameModel.Background.position = new Vec3(this.gameModel.Background.position.x - this.speed, this.gameModel.Background.position.y);
-            this.Score+=this.countScore;
+            setTimeout(() => {
+                this.Score+=this.countScore;
+            }, 5000);
             if(Date.now()>this.nexfireRocket){
                 this.nexfireRocket=Date.now()+this.firerateRocket
                 this.gameModel.WarningNode.position=new Vec3(this.gameModel.WarningNode.position.x,this.gameModel.Character.position.y);
@@ -242,25 +243,67 @@ export class GameController extends Component {
             Enemy && (Enemy.GetNode().position = new Vec3(i * spacing, 0, 0));
             Enemy && (Enemy.GetNode().setRotationFromEuler(0, 0, RotationRandom));
         }
-
+        let usedPositions = []; 
         for (let i = 0; i < this.glowNode.children.length; i++) {
             const childNode = this.glowNode.children[i];
-            const newX = childNode.position.x - this.speed ;
-            childNode.position = new Vec3(newX, childNode.position.y, childNode.position.z);
-            if(childNode.position.x<-2000)
-            {
-                const randomDelay = Math.floor(math.randomRange(3000, 7000));;
-                setTimeout(() => {
-                const randomValueX = Math.floor(math.randomRange(400, 900));
-                const randomValueY = Math.floor(math.randomRange(40, 100));
-                childNode.position = new Vec3(randomValueX, randomValueY);
-            }, randomDelay);
+            this.scheduleOnce(() => { 
+                const newX = childNode.position.x - this.speed;
+                if (newX < -2000) {
+                    let randomValueX;
+                    let randomValueY;
+                    do {
+                        randomValueX = Math.floor(Math.random() * 5) + 1;
+                        randomValueY = Math.floor(math.randomRangeInt(10,90));
+                    } while (usedPositions.some(pos => {
+                        const distance = Math.abs(randomValueX * 1000 - pos.x);
+                        return distance < 1000;
+                    }));
+            
+                    usedPositions.push({ x: randomValueX * 1000, y: randomValueY });
+                    childNode.position = new Vec3(randomValueX * 1000, randomValueY);
+                } else {
+                    childNode.position = new Vec3(newX, childNode.position.y, childNode.position.z);
+                }
+            }, 5);
+        }
+        {
+            for (let i = 0; i < this.gameModel.RocketNode.children.length; i++) {
+                const childNode = this.gameModel.RocketNode.children[i];
+
+                this.scheduleOnce(()=> {
+                    childNode.getComponent(RigidBody2D).linearVelocity=new Vec2(-30,0)
+                }, 10);
+
+                if(childNode.position.x<=-2000)
+                {
+                    const randomTime=math.randomRange(4,9)
+                    childNode.getComponent(RigidBody2D).linearVelocity=new Vec2(0,0)
+                    this.scheduleOnce(()=> {
+                        const randomValueX = Math.floor(math.randomRange(400, 900));
+                        if(this.gameModel.Character){
+     
+                            childNode.position=new Vec3(randomValueX,this.gameModel.Character.position.y);
+                        }
+                        childNode.getComponent(RigidBody2D).linearVelocity=new Vec2(-30,0)
+                    }, randomTime);
+
+                //     setTimeout(() => {
+                //        const randomValueX = Math.floor(math.randomRange(400, 900));
+                //        if(this.gameModel.Character){
+    
+                //            childNode.position=new Vec3(randomValueX,this.gameModel.Character.position.y);
+                //        }
+                //        childNode.getComponent(RigidBody2D).linearVelocity=new Vec2(-30,0)
+                //    }, randomTime);
+                }
             }
         }
-    }
+        
     }
 
- 
+    this.ScoreCur.string = `${this.Score}`;
+    this.ScoreEnd.string = `${this.Score}`;
+    }
 
     private onPlayerContact(selfCollider: Collider2D, otherCollider: Collider2D, contact: IPhysics2DContact | null): void{
         if(otherCollider.tag===1)
@@ -291,7 +334,6 @@ export class GameController extends Component {
         {
             if(this.checkPoint2.active===false)
             {
-
                 this.checkPoint2.active=true;
             }
             this.background1.setPosition(this.background1.position.x+22093.152,this.background1.position.y);
@@ -321,17 +363,15 @@ export class GameController extends Component {
                 }
                 this.OverPandel.active=true;
             }
-            // this.gameCenter.completeMatch(() => {}, {
-            //     score: Math.floor(this.Score),
-            // });
+            this.gameCenter.completeMatch(() => {}, {
+                score: Math.floor(this.Score),
+            });
         }
-
         if(otherCollider.tag===8)
         {
             this.touchEnd();
             input.off(Input.EventType.TOUCH_START,this.touchStart,this);
             input.off(Input.EventType.TOUCH_END,this.touchEnd,this);
-            // this.Head.position.x
             this.gameModel.CharacterAniHead.play('HeadFire')
             this.gameModel.CharacterAniBody.play('BodyFire')
             this.gameModel.CharacterAniJacket.node.active=false;
@@ -349,27 +389,11 @@ export class GameController extends Component {
                 await this.delay(300);
             }
             this.OverPandel.active=true;
+            this.gameCenter.completeMatch(() => {}, {
+                score: Math.floor(this.Score),
+            });
         }
     }
-
-    // private async glowContact(selfCollider: Collider2D, otherCollider: Collider2D, contact: IPhysics2DContact | null): Promise<void> {
-    //     console.log("aaaa");
-    
-    //     // Tạo một độ trễ ngẫu nhiên trong khoảng từ 500ms đến 1500ms
-    //     const randomDelay = Math.floor(math.randomRange(3000, 7000));;
-    
-    //     // Đặt một timeout để thực hiện thay đổi vị trí sau độ trễ ngẫu nhiên
-    //     setTimeout(() => {
-    //         const randomValueX = Math.floor(math.randomRange(400, 900));
-    //         const randomValueY = Math.floor(math.randomRange(40, 100));
-    //         const randomScaleX = Math.random() * (1 - 0.7) + 0.7;
-    //         const randomScaleY = Math.random() * (1 - 0.5) + 0.5;
-    
-    //         // Áp dụng các giá trị ngẫu nhiên vào vị trí và tỷ lệ của otherCollider.node
-    //         otherCollider.node.position = new Vec3(randomValueX, randomValueY);
-    //         // otherCollider.node.setScale(randomScaleX, randomScaleY);
-    //     }, randomDelay);
-    // }
 
     private delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -383,7 +407,6 @@ export class GameController extends Component {
     {
         this.checkFly=true;
         this.characterAniFly();  
-        
     }
 
     private touchEnd(): void
@@ -411,7 +434,6 @@ export class GameController extends Component {
         this.BulletNode.active=true;
     }
 
-
     private skipRed():void
     {
         this.SkipNode.active=false;
@@ -419,7 +441,7 @@ export class GameController extends Component {
         {
             this.Skip.active=true;
         }
-        this.Head.position=new Vec3(this.Head.position.x+13)
+        this.Head.position=new Vec3(this.Head.position.x+10)
         this.gameModel.CharacterAniBody.play('SkipBody');
         this.gameModel.CharacterAniJacket.play('SkipJacket');
         this.gameModel.SkipBody.play('Skipred');
@@ -428,9 +450,14 @@ export class GameController extends Component {
         this.speed=100;
         this.countScore=3;
         this.charRigi.enabled=false;
+        input.off(Input.EventType.TOUCH_START,this.touchStart,this);
+        input.off(Input.EventType.TOUCH_END,this.touchEnd,this);
         setTimeout(() => {
+            input.on(Input.EventType.TOUCH_START,this.touchStart,this);
+            input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
+            this.gameModel.Jacket.position=this.JacketPos;
             this.charRigi.enabled=true;
-            this.Head.position=new Vec3(this.Head.position.x-13)
+            this.Head.position=new Vec3(this.Head.position.x-10)
             this.speed=10;
             this.gameModel.CharacterAniBody.play('BodyRun');
             this.gameModel.CharacterAniHead.play('Headrun');
@@ -449,6 +476,8 @@ export class GameController extends Component {
         {
             this.Skip.active=true;
         }
+        input.off(Input.EventType.TOUCH_START,this.touchStart,this);
+        input.off(Input.EventType.TOUCH_END,this.touchEnd,this);
         this.Head.position=new Vec3(this.Head.position.x+13)
         this.gameModel.CharacterAniBody.play('SkipBody');
         this.gameModel.CharacterAniJacket.play('SkipJacket');
@@ -459,6 +488,9 @@ export class GameController extends Component {
         this.countScore=2;
         this.charRigi.enabled=false;
         setTimeout(() => {
+            input.on(Input.EventType.TOUCH_START,this.touchStart,this);
+            input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
+            this.gameModel.Jacket.position=this.JacketPos;
             this.Head.position=new Vec3(this.Head.position.x-13)
             this.charRigi.enabled=true;
             this.speed=10;
@@ -474,8 +506,18 @@ export class GameController extends Component {
 
     private startNode():void
     {
+        this.SettingIcon.active=false;
         this.checkStart=true;
         this.title.active=false;
+        input.on(Input.EventType.TOUCH_START,this.touchStart,this);
+        input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
+        setTimeout(() => {
+            this.SkipNode.active=true
+        }, 1000);
+
+        setTimeout(() => {
+            this.SkipNode.active=false
+        }, 5000);
     }
 
     private replay():void
@@ -483,6 +525,12 @@ export class GameController extends Component {
         director.loadScene("Game")
     }
 
-    
+    private Exit():void{
+        this.Setting.active=false
+    }
+
+    private SettingPan():void{
+        this.Setting.active=true;
+    }
 }
 

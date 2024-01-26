@@ -3,13 +3,12 @@ import { StoreAPI } from '../StoreAPI';
 import { Constants } from '../Data/Constants';
 import GameClient from '@onechaintech/gamesdk-dev';
 
-
 const { ccclass, property } = _decorator;
 
 @ccclass('GameCenterController')
 export class GameCenterController extends Component {
-    private readonly gameIDDev: string = '64ec6fc0af99693c5b2df8b4';
-    private readonly apiKeyDev: string = '93850d91-4878-46f3-b264-d156f91de329';
+    private readonly gameIDDev: string = '65b321354c61324e3898d072';
+    private readonly apiKeyDev: string = 'b5997d83-7e31-4836-a300-bb393b767f27';
     public gameClient;
 
     public async initGameClient(callBack: () => void): Promise<void> {
