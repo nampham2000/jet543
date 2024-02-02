@@ -1,4 +1,4 @@
-import { _decorator, Component, Node,Animation, Prefab } from 'cc';
+import { _decorator, Component, Node,Animation, Prefab, Label } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('GameModel')
@@ -74,6 +74,17 @@ export class GameModel extends Component {
     public set WarningNode(value: Node) {
         this.warningNode = value;
     }
+    
+    @property({type:Label})
+    private bestscore:Label
+  
+    public get BestScore() : Label {
+       return this.bestscore
+    }
+     
+    public set BestScoreValue(v : Label) {
+       this.bestscore = v;
+    }
 //------------------Character Animtaion------------------------------------
     @property({
         type: Animation,
@@ -141,15 +152,15 @@ export class GameModel extends Component {
 
     @property({
         type: Animation,
-        tooltip: 'CharacterBody'
+        tooltip: 'Shield'
     })
-    private skipTail: Animation;
+    private shield: Animation;
 
-    public get SkipTail(): Animation {
-        return this.skipTail;
+    public get Shield(): Animation {
+        return this.shield;
     }
-    public set SkipTail(value: Animation) {
-        this.skipTail = value;
+    public set Shield(value: Animation) {
+        this.shield = value;
     }
 
     @property({
