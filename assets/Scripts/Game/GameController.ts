@@ -1,4 +1,4 @@
-import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3, Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate, view, Label, AudioSource, randomRangeInt, Camera } from 'cc';
+import { _decorator, CCInteger, Collider2D, Component, Contact2DType, Input, input, IPhysics2DContact, math, Node, Prefab, Quat, RigidBody2D, Vec2, Vec3, Animation, cclegacy, log, director, tiledLayerAssembler, BoxCollider2D, tween, instantiate, view, Label, AudioSource, randomRangeInt, Camera, quat, UITransform } from 'cc';
 import { GameModel } from './GameModel';
 import { ObjectPool } from '../Pool/ObjectPool';
 import { NodeCustom } from '../Pool/NodeCustom';
@@ -153,10 +153,23 @@ export class GameController extends Component {
     private GrayAsset: Node;
 
     @property(Node)
+    private Door: Node;
+
+    @property(Node)
     private Camera2d: Node;
 
     @property(Node)
+    private CameraUi: Node;
+
+    @property(Node)
+    private CameraRender: Node;
+
+    @property(Node)
     private OverLabel: Node;
+
+    @property(Node)
+    private parentNode: Node = null;
+
 
     @property(Animation)
     private GrayAssetChild: Animation;
@@ -176,6 +189,11 @@ export class GameController extends Component {
     @property(Animation)
     private appearRobotSmoke: Animation;
 
+    @property(Animation)
+    private CycleSkip: Animation;
+
+    @property(Animation)
+    private SmokeAni: Animation;
 
     @property({ type: AudioController })
     private audioController: AudioController;
@@ -188,6 +206,11 @@ export class GameController extends Component {
 
     @property({ type: AudioSource })
     private RobotRun: AudioSource;
+
+    @property({ type: AudioSource })
+    private audioFireSkip: AudioSource;
+    @property({type:Prefab})
+    private coinPrefabs:Prefab;
 
     
 
@@ -217,7 +240,7 @@ export class GameController extends Component {
     private checkcOUNTRobot:number=0;
     private safeStatus:boolean=false;
     private checkLive:boolean=false;
-    
+    private checkSkip:boolean=false;
     
 
     protected onLoad(): void {
@@ -239,6 +262,30 @@ export class GameController extends Component {
         if (this.OverLabel) {
             this.OverLabel.active = false;
         }
+        const parentNode = this.parentNode;
+        const rows = 2;
+        const cols = 2;
+
+        this.splitNodeIntoGrid(this.parentNode, 4, 6);
+        const onePositions = [
+            [0, 0], // O
+            [1, 0], // N
+            [0, 1], // E
+        ];
+
+        const cellWidth = parentNode.getComponent(UITransform).width / cols;
+        const cellHeight = parentNode.getComponent(UITransform).height / rows;
+
+        // Create and position prefabs to form the letter "One"
+        for (const [col, row] of onePositions) {
+            const positionX = col * cellWidth + cellWidth / 2;
+            const positionY = row * cellHeight + cellHeight / 2;
+            const coinNode = instantiate(this.coinPrefabs);
+            coinNode.getComponent(UITransform).width = cellWidth;
+            coinNode.getComponent(UITransform).height = cellHeight;
+            coinNode.setPosition(new Vec3(positionX, positionY));
+            parentNode.addChild(coinNode);
+        }
         // input.on(Input.EventType.TOUCH_START,this.touchStart,this);
         // input.on(Input.EventType.TOUCH_END,this.touchEnd,this);
         ObjectPool.Instance.CreateListObject(Constants.bulletPrefab1, this.bullet, 30, this.BulletNode);
@@ -255,6 +302,8 @@ export class GameController extends Component {
         // });
     }
    
+
+
 
     private contactBird(): void {
         const playerCollider = this.land.getComponent(Collider2D);
@@ -483,6 +532,7 @@ export class GameController extends Component {
                 this.countHitLand++;
                 if(this.countHitLand===1)
                 {
+                    this.gameModel.Character.getComponent(RigidBody2D).enabled=false;
                     this.checkGamepover = true;
                     this.touchEnd();
                     input.off(Input.EventType.TOUCH_START, this.touchStart, this);
@@ -503,15 +553,16 @@ export class GameController extends Component {
                             this.OverLabel.active=false;
                             this.countScore = 0
                             this.OverPandel.active = true;
-                            // this.gameCenter.completeMatch(() => {}, {
-                            //     score: Math.floor(this.Score),
-                            // });
-                            // this.saveBestScore();
+                            this.gameCenter.completeMatch(() => {}, {
+                                score: Math.floor(this.Score),
+                            });
+                            this.saveBestScore();
                         }
                     });
                 }
                 this.checkGamepover = true
                 if (this.countHitLand === 2) {
+                    this.gameModel.Character.getComponent(RigidBody2D).enabled=false;
                     this.touchEnd();
                     this.safeStatus=true;
                     input.off(Input.EventType.TOUCH_START, this.touchStart, this);
@@ -528,13 +579,15 @@ export class GameController extends Component {
                     }
                     this.OverPandel.active = true;
                 }
-                // this.gameCenter.completeMatch(() => {}, {
-                //     score: Math.floor(this.Score),
-                // });
+                this.gameCenter.completeMatch(() => {}, {
+                    score: Math.floor(this.Score),
+                });
 
-                // this.saveBestScore();
+                this.saveBestScore();
             }
             if (otherCollider.tag === 8 && this.ShieldStatus === false) {
+                this.gameModel.Character.getComponent(RigidBody2D).enabled=false;
+                this.rocket.active=false;
                 this.checkGamepover = true;
                 this.audioController.onAudio(5)
                 this.touchEnd();
@@ -577,6 +630,10 @@ export class GameController extends Component {
     }
 
     private touchStart(): void {
+        if(this.checkSkip===true)
+        {
+            return;
+        }
         this.checkFly = true;
         if(this.Skill.active===false)
         {
@@ -613,6 +670,10 @@ export class GameController extends Component {
     }
 
     private touchEnd(): void {
+        if(this.checkSkip===true)
+        {
+            return;
+        }
         this.gameModel.Character.getComponent(RigidBody2D).gravityScale=2;
         this.checkFly = false;
         this.gameModel.CharacterAniBody.play('Down');
@@ -633,7 +694,6 @@ export class GameController extends Component {
                 if(this.checkFlyRobot===true)
                 {
                     this.Skill.getComponent(Animation).stop();
-                  
                 }
             });
         }
@@ -661,7 +721,6 @@ export class GameController extends Component {
                 if(this.checkFlyRobot===true)
                 {
                     this.Skill.getComponent(Animation).stop();
-                  
                 }
             });
         }
@@ -683,82 +742,91 @@ export class GameController extends Component {
         this.BulletNode.active = true;
     }
 
-    private skipRed(): void {
-        this.ScoreStatus = true;
-        this.SkipNode.active = false;
-        if (this.Skip.active === false) {
-            this.Skip.active = true;
+    private splitNodeIntoGrid(parentNode: Node, rows: number, cols: number) {
+        
+        const parentWidth = parentNode.getComponent(UITransform).width;
+        const parentHeight = parentNode.getComponent(UITransform).height;
+        const cellWidth = parentWidth / cols;
+        const cellHeight = parentHeight / rows;
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const childNode = instantiate(this.coinPrefabs);
+                childNode.getComponent(UITransform).width = cellWidth;
+                childNode.getComponent(UITransform).height = cellHeight;
+                childNode.setPosition(new Vec3(0 * cellWidth + cellWidth / 2, 1 * cellHeight + cellHeight / 2));
+                parentNode.addChild(childNode);
+            }
         }
-        this.Head.position = new Vec3(this.Head.position.x + 13)
-        this.gameModel.CharacterAniBody.play('SkipBody');
-        this.gameModel.CharacterAniJacket.play('SkipJacket');
-        this.gameModel.SkipBody.play('HeadViolet');
-        this.gameModel.SkipHead.play('HeadBody');
-        // this.gameModel.SkipTail.play('Tailred');
-        this.speed = 100;
-        this.countScore = 3;
-        this.charRigi.enabled = false;
-        input.off(Input.EventType.TOUCH_START, this.touchStart, this);
-        input.off(Input.EventType.TOUCH_END, this.touchEnd, this);
-        setTimeout(() => {
-            input.on(Input.EventType.TOUCH_START, this.touchStart, this);
-            input.on(Input.EventType.TOUCH_END, this.touchEnd, this);
-            input.on(Input.EventType.TOUCH_CANCEL, this.touchCancel, this);
-            this.gameModel.Jacket.position = this.JacketPos;
-            this.charRigi.enabled = true;
-            this.Head.position = new Vec3(this.Head.position.x - 13)
-            this.speed = 10;
-            this.gameModel.CharacterAniBody.play('BodyRun');
-            this.gameModel.CharacterAniHead.play('Headrun');
-            this.gameModel.CharacterAniJacket.play('Jacket');
-            this.gameModel.CharacterAniJacket.node.rotation = new Quat(0, 0, 0);
-            this.gameModel.CharacterAniBody.node.rotation = new Quat(0, 0, 0);
-            this.Skip.active = false;
-            this.countScore = 1;
-        }, 5000);
     }
 
-    private skipBlue(): void {
+
+    private skipRed(): void {
+        this.checkSkip=true;
+        this.audioController.onAudio(16)
+        this.CycleSkip.play();
         this.safeStatus=true;
         this.ScoreStatus = true;
         this.SkipNode.active = false;
-        if (this.Skip.active === false) {
-            this.Skip.active = true;
-        }
-        input.off(Input.EventType.TOUCH_START, this.touchStart, this);
-        input.off(Input.EventType.TOUCH_END, this.touchEnd, this);
-        // input.on(Input.EventType.TOUCH_CANCEL, this.touchCancel, this);
-        this.Head.position = new Vec3(this.Head.position.x + 13)
-        this.gameModel.CharacterAniBody.play('SkipBody');
-        this.gameModel.CharacterAniJacket.play('SkipJacket');
-        this.gameModel.SkipBody.play('BodyBlue');
-        this.gameModel.SkipHead.play('HeadBlue');
-        // this.gameModel.SkipTail.play('SkipBlueTail');
-        this.speed = 60;
-        this.countScore = 2;
         this.charRigi.enabled = false;
-        setTimeout(() => {
-            this.Camera2d.on(Input.EventType.TOUCH_START, this.touchStart, this);
-            this.Camera2d.on(Input.EventType.TOUCH_END, this.touchEnd, this);
-            this.Camera2d.on(Node.EventType.TOUCH_CANCEL, this.touchCancel, this);
-            this.gameModel.Jacket.position = this.JacketPos;
-            this.Head.position = new Vec3(this.Head.position.x - 13)
-            this.charRigi.enabled = true;
-            this.speed = 10;
-            this.gameModel.CharacterAniBody.play('BodyRun');
-            this.gameModel.CharacterAniHead.play('Headrun');
-            this.gameModel.CharacterAniJacket.play('Jacket');
-            this.gameModel.CharacterAniJacket.node.rotation = new Quat(0, 0, 0);
-            this.gameModel.CharacterAniBody.node.rotation = new Quat(0, 0, 0);
-            this.Skip.active = false;
-            this.countScore = 1;
-        }, 5000);
-        setTimeout(() => {
-            this.safeStatus=false;
-        }, 8000);
+        this.CycleSkip.getComponent(Animation).on(Animation.EventType.FINISHED, () => {
+            this.redSetting();
+        });
+        // this.CameraUi.getComponent(Animation).play();
+        // this.CameraRender.getComponent(Animation).play()
+        // this.ScoreStatus = true;
+        // this.SkipNode.active = false;
+        // if (this.Skip.active === false) {
+        //     this.Skip.active = true;
+        // }
+        // this.Head.position = new Vec3(this.Head.position.x + 13)
+        // this.gameModel.CharacterAniBody.play('SkipBody');
+        // this.gameModel.CharacterAniJacket.play('SkipJacket');
+        // this.gameModel.SkipBody.play('HeadViolet');
+        // this.gameModel.SkipHead.play('HeadBody');
+        // // this.gameModel.SkipTail.play('Tailred');
+        // this.speed = 100;
+        // this.countScore = 3;
+        // this.charRigi.enabled = false;
+        // input.off(Input.EventType.TOUCH_START, this.touchStart, this);
+        // input.off(Input.EventType.TOUCH_END, this.touchEnd, this);
+        // setTimeout(() => {
+        //     this.CameraUi.getComponent(Animation).stop();
+        //     this.CameraRender.getComponent(Animation).stop();
+        //     input.on(Input.EventType.TOUCH_START, this.touchStart, this);
+        //     input.on(Input.EventType.TOUCH_END, this.touchEnd, this);
+        //     input.on(Input.EventType.TOUCH_CANCEL, this.touchCancel, this);
+        //     this.gameModel.Jacket.position = this.JacketPos;
+        //     this.charRigi.enabled = true;
+        //     this.Head.position = new Vec3(this.Head.position.x - 13)
+        //     this.speed = 10;
+        //     this.gameModel.CharacterAniBody.play('BodyRun');
+        //     this.gameModel.CharacterAniHead.play('Headrun');
+        //     this.gameModel.CharacterAniJacket.play('Jacket');
+        //     this.gameModel.CharacterAniJacket.node.rotation = new Quat(0, 0, 0);
+        //     this.gameModel.CharacterAniBody.node.rotation = new Quat(0, 0, 0);
+        //     this.Skip.active = false;
+        //     this.countScore = 1;
+        // }, 5000);
+    }
+
+    private skipBlue(): void {
+        this.checkSkip=true;
+        this.audioController.onAudio(16)
+        this.CycleSkip.play();
+        this.safeStatus=true;
+        this.ScoreStatus = true;
+        this.SkipNode.active = false;
+        this.charRigi.enabled = false;
+        this.CycleSkip.getComponent(Animation).on(Animation.EventType.FINISHED, () => {
+            this.blueSetting();
+        });
     }
 
     private startNode(): void {
+        this.SmokeAni.node.active=true;
+        this.SmokeAni.play();
+        this.audioController.onAudio(20);
+        this.Door.active=true;
         this.gameModel.Character.getComponent(Animation).play('MoveStart');
         this.gameModel.Character.getComponent(Animation).on(Animation.EventType.FINISHED, () => {
             this.checkStart = true;
@@ -818,31 +886,140 @@ export class GameController extends Component {
 
     private Heal():void
     {
+        this.gameModel.Character.getComponent(RigidBody2D).enabled=true;
+        this.audioController.onAudio(18)
         this.checkLive=true;
         this.OverLabel.active=false;
         this.LightAni.play();
         tween(this.gameModel.Character)
         .to(3, {rotation: new Quat(0,0)})
         .call(() => { 
-            this.countScore=1;
-            input.on(Input.EventType.TOUCH_START, this.touchStart, this);
-            this.Camera2d.on(Input.EventType.TOUCH_CANCEL, this.touchEnd, this);
-            input.on(Input.EventType.TOUCH_END, this.touchEnd, this);
-            this.gameModel.CharacterAniHead.node.setRotation(new Quat(0,0));
-            this.gameModel.CharacterAniBody.node.setRotation(new Quat(0,0));
-            this.gameModel.CharacterAniHead.play('Headrun');
-            this.gameModel.CharacterAniBody.play('BodyRun');
-            this.gameModel.CharacterAniJacket.node.active = true;
-            this.speed=10;
-            this.LightAni.node.active=false;
+            this.gameModel.Shield.play('HealEffect')
+            this.gameModel.Shield.on(Animation.EventType.FINISHED, () => {
+                this.resetStatus();
+             });
         })
         .start()
-       
     }
 
 
     private saveBestScore(): void {
         Constants.dataUser.highScore = Constants.dataUser.highScore < this.Score ? this.Score : Constants.dataUser.highScore;
+    }
+
+    private resetStatus():void
+    {
+        this.countScore=1;
+        input.on(Input.EventType.TOUCH_START, this.touchStart, this);
+        this.Camera2d.on(Input.EventType.TOUCH_CANCEL, this.touchEnd, this);
+        input.on(Input.EventType.TOUCH_END, this.touchEnd, this);
+        this.gameModel.CharacterAniHead.node.setRotation(new Quat(0,0));
+        this.gameModel.CharacterAniBody.node.setRotation(new Quat(0,0));
+        this.gameModel.CharacterAniHead.play('Headrun');
+        this.gameModel.CharacterAniBody.play('BodyRun');
+        this.gameModel.CharacterAniJacket.node.active = true;
+        this.speed=10;
+        this.LightAni.node.active=false;
+    }
+
+
+    private blueSetting():void
+    {
+        this.audioController.onAudio(17);
+        this.audioFireSkip.play();
+        this.CameraUi.getComponent(Animation).play();
+        this.CameraRender.getComponent(Animation).play();
+        this.safeStatus=true;
+        this.ScoreStatus = true;
+        this.SkipNode.active = false;
+        if (this.Skip.active === false) {
+            this.Skip.active = true;
+        }
+        // input.off(Input.EventType.TOUCH_START, this.touchStart, this);
+        // input.off(Input.EventType.TOUCH_END, this.touchEnd, this);
+        // input.on(Input.EventType.TOUCH_CANCEL, this.touchCancel, this);
+        this.Head.position = new Vec3(this.Head.position.x + 13)
+        this.gameModel.CharacterAniBody.play('SkipBody');
+        this.gameModel.CharacterAniJacket.play('SkipJacket');
+        this.gameModel.SkipBody.play('BodyBlue');
+        this.gameModel.SkipHead.play('HeadBlue');
+        // this.gameModel.SkipTail.play('SkipBlueTail');
+        this.speed = 60;
+        this.countScore = 2;
+        this.charRigi.enabled = false;
+        setTimeout(() => {
+            this.audioFireSkip.stop();
+            this.audioController.onAudio(19)
+            this.CameraUi.getComponent(Animation).stop();
+            this.CameraRender.getComponent(Animation).stop();
+            this.Camera2d.on(Input.EventType.TOUCH_START, this.touchStart, this);
+            this.Camera2d.on(Input.EventType.TOUCH_END, this.touchEnd, this);
+            this.Camera2d.on(Node.EventType.TOUCH_CANCEL, this.touchCancel, this);
+            this.gameModel.Jacket.position = this.JacketPos;
+            this.Head.position = new Vec3(this.Head.position.x - 13)
+            this.charRigi.enabled = true;
+            this.speed = 10;
+            this.gameModel.CharacterAniBody.play('BodyRun');
+            this.gameModel.CharacterAniHead.play('Headrun');
+            this.gameModel.CharacterAniJacket.play('Jacket');
+            this.gameModel.CharacterAniJacket.node.rotation = new Quat(0, 0, 0);
+            this.gameModel.CharacterAniBody.node.rotation = new Quat(0, 0, 0);
+            this.Skip.active = false;
+            this.countScore = 1;
+            this.checkSkip=false;
+        }, 5000);
+        setTimeout(() => {
+            this.safeStatus=false;
+        }, 8000);
+    }
+
+    private redSetting():void
+    {
+        this.audioController.onAudio(17);
+        this.audioFireSkip.play();
+        this.CameraUi.getComponent(Animation).play();
+        this.CameraRender.getComponent(Animation).play()
+        this.ScoreStatus = true;
+        this.SkipNode.active = false;
+        if (this.Skip.active === false) {
+            this.Skip.active = true;
+        }
+        this.Head.position = new Vec3(this.Head.position.x + 13)
+        this.gameModel.CharacterAniBody.play('SkipBody');
+        this.gameModel.CharacterAniJacket.play('SkipJacket');
+        this.gameModel.SkipBody.play('HeadViolet');
+        this.gameModel.SkipHead.play('HeadBody');
+        // this.gameModel.SkipTail.play('Tailred');
+        this.speed = 100;
+        this.countScore = 3;
+        this.charRigi.enabled = false;
+        input.off(Input.EventType.TOUCH_START, this.touchStart, this);
+        input.off(Input.EventType.TOUCH_END, this.touchEnd, this);
+        setTimeout(() => {
+            this.audioFireSkip.stop();
+            this.audioController.onAudio(19)
+            this.CameraUi.getComponent(Animation).stop();
+            this.CameraRender.getComponent(Animation).stop();
+            input.on(Input.EventType.TOUCH_START, this.touchStart, this);
+            input.on(Input.EventType.TOUCH_END, this.touchEnd, this);
+            input.on(Input.EventType.TOUCH_CANCEL, this.touchCancel, this);
+            this.gameModel.Jacket.position = this.JacketPos;
+            this.charRigi.enabled = true;
+            this.Head.position = new Vec3(this.Head.position.x - 13)
+            this.speed = 10;
+            this.gameModel.CharacterAniBody.play('BodyRun');
+            this.gameModel.CharacterAniHead.play('Headrun');
+            this.gameModel.CharacterAniJacket.play('Jacket');
+            this.gameModel.CharacterAniJacket.node.rotation = new Quat(0, 0, 0);
+            this.gameModel.CharacterAniBody.node.rotation = new Quat(0, 0, 0);
+            this.Skip.active = false;
+            this.countScore = 1;
+            this.checkSkip=false;
+        }, 5000);
+
+        setTimeout(() => {
+            this.safeStatus=false;
+        }, 8000);
     }
 }
 
